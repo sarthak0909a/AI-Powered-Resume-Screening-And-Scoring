@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Resume Screener</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Lighter blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 24px;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px; /* More rounded corners */
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); /* Stronger shadow */
+            padding: 40px;
+            width: 100%;
+            max-width: 900px; /* Slightly wider container */
+            display: flex;
+            flex-direction: column;
+            gap: 32px; /* More spacing */
+        }
+        textarea {
+            min-height: 180px; /* Taller text areas */
+            resize: vertical;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        textarea:focus {
+            border-color: #6366f1; /* Indigo focus border */
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); /* Indigo shadow on focus */
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ffffff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: none; /* Hidden by default */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .results-section, .ai-analysis-section, .ai-feature-section {
+            background-color: #e0f2fe; /* Light blue background for results */
+            border-radius: 12px;
+            padding: 28px;
+            border: 1px solid #90cdf4; /* Blue border */
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05); /* Subtle inner shadow */
+        }
+        .ai-analysis-section {
+            background-color: #e6fffa; /* Light teal background for AI analysis */
+            border: 1px solid #81e6d9; /* Teal border */
+        }
+        .ai-feature-section {
+            background-color: #f3e8ff; /* Light purple for new AI features */
+            border: 1px solid #c4b5fd; /* Purple border */
+        }
+        .error-message {
+            background-color: #fee2e2; /* Light red */
+            color: #ef4444; /* Red text */
+            border: 1px solid #fca5a5; /* Red border */
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .file-upload-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+        }
+        .file-input-label {
+            background-color: #4a5568; /* Darker gray for file input */
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            font-weight: 600;
+        }
+        .file-input-label:hover {
+            background-color: #2d3748;
+        }
+        .file-name {
+            font-weight: 500;
+            color: #4a5568;
+        }
+        /* Style for the new ATS button to make it distinct */
+        #calculateAtsButton {
+            background-color: #22c55e; /* Green */
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+            display: flex; /* Ensure flex for spinner */
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        #calculateAtsButton:hover:not(:disabled) {
+            background-color: #16a34a; /* Darker green on hover */
+        }
+        #calculateAtsButton:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-6">
+    <div class="container">
+        <h1 class="text-4xl font-extrabold text-center text-gray-900 mb-8">AI-Powered Resume Screener</h1>
+
+        <div class="space-y-8">
+            <div>
+                <label for="jobDescription" class="block text-xl font-semibold text-gray-800 mb-3">Job Description</label>
+                <textarea id="jobDescription"
+                          class="mt-1 block w-full p-4 border border-gray-300 rounded-xl shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-gray-800 placeholder-gray-400"
+                          placeholder="Paste the job description here..."></textarea>
+            </div>
+
+            <div>
+                <label for="resumeText" class="block text-xl font-semibold text-gray-800 mb-3">Resume Text</label>
+                <textarea id="resumeText"
+                          class="mt-1 block w-full p-4 border border-gray-300 rounded-xl shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-gray-800 placeholder-gray-400"
+                          placeholder="Paste the resume text here or upload a .txt, .pdf, or .docx file..."></textarea>
+                <div class="mt-4 file-upload-container">
+                    <input type="file" id="resumeUpload" accept=".txt,.pdf,.docx" class="hidden">
+                    <label for="resumeUpload" class="file-input-label">Upload Resume (.txt, .pdf, .docx)</label>
+                    <span id="uploadedFileName" class="file-name text-gray-600">No file chosen</span>
+                    <button id="clearResumeButton" class="ml-auto bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-semibold text-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition duration-200 ease-in-out">Clear</button>
+                    <!-- New ATS button, initially hidden and disabled -->
+                    <button id="calculateAtsButton"
+                            class="ml-auto" style="display: none;" disabled>
+                        Calculate ATS Score
+                        <div id="loadingSpinnerAts" class="loading-spinner w-4 h-4"></div>
+                    </button>
+                </div>
+                <p id="fileUploadMessage" class="text-sm text-gray-500 mt-2 hidden">
+                    Note: For .pdf and .docx files, the content will be extracted and placed in the text area.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button id="scoreButton"
+                        class="w-full bg-indigo-600 text-white py-4 px-8 rounded-xl font-bold text-xl hover:bg-indigo-700 focus:outline-none focus:ring-3 focus:ring-indigo-500 focus:ring-offset-2 transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center gap-3">
+                    Score & Analyze Resume
+                    <div id="loadingSpinnerScore" class="loading-spinner"></div>
+                </button>
+                <button id="interviewQuestionsButton"
+                        class="w-full bg-purple-600 text-white py-4 px-8 rounded-xl font-bold text-xl hover:bg-purple-700 focus:outline-none focus:ring-3 focus:ring-purple-500 focus:ring-offset-2 transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center gap-3">
+                    ✨ Interview Questions
+                    <div id="loadingSpinnerQuestions" class="loading-spinner"></div>
+                </button>
+                <button id="improvementSuggestionsButton"
+                        class="w-full bg-pink-600 text-white py-4 px-8 rounded-xl font-bold text-xl hover:bg-pink-700 focus:outline-none focus:ring-3 focus:ring-pink-500 focus:ring-offset-2 transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center gap-3">
+                    ✨ Resume Improvements
+                    <div id="loadingSpinnerImprovements" class="loading-spinner"></div>
+                </button>
+            </div>
+        </div>
+
+        <div id="results" class="mt-10 space-y-8 hidden">
+            <div id="keywordMatchingSection" class="results-section">
+                <h2 class="text-3xl font-bold text-blue-800 mb-5">Keyword Matching Results</h2>
+                <p class="text-2xl text-blue-700 mb-4">ATS Matching Score: <span id="score" class="font-extrabold text-blue-900"></span>%</p>
+                <div id="matchedKeywords" class="mt-6">
+                    <h3 class="text-xl font-semibold text-blue-700 mb-3">Matched Keywords:</h3>
+                    <ul id="keywordsList" class="list-disc list-inside text-blue-600 space-y-1">
+                        <!-- Matched keywords will be inserted here -->
+                    </ul>
+                </div>
+                <div id="missingKeywords" class="mt-6">
+                    <h3 class="text-xl font-semibold text-blue-700 mb-3">Missing Keywords:</h3>
+                    <ul id="missingKeywordsList" class="list-disc list-inside text-blue-600 space-y-1">
+                        <!-- Missing keywords will be inserted here -->
+                    </ul>
+                </div>
+            </div>
+
+            <div id="aiAnalysisSection" class="ai-analysis-section hidden">
+                <h2 class="text-3xl font-bold text-teal-800 mb-5">AI-Powered Analysis</h2>
+                <div id="aiSummary" class="mb-6">
+                    <h3 class="text-xl font-semibold text-teal-700 mb-3">Summary:</h3>
+                    <p id="summaryText" class="text-teal-800 leading-relaxed"></p>
+                </div>
+                <div id="aiStrengths" class="mb-6">
+                    <h3 class="text-xl font-semibold text-teal-700 mb-3">Strengths:</h3>
+                    <ul id="strengthsList" class="list-disc list-inside text-teal-700 space-y-1"></ul>
+                </div>
+                <div id="aiWeaknesses" class="mb-6">
+                    <h3 class="text-xl font-semibold text-teal-700 mb-3">Areas for Improvement:</h3>
+                    <ul id="weaknessesList" class="list-disc list-inside text-teal-700 space-y-1"></ul>
+                </div>
+            </div>
+
+            <div id="interviewQuestionsSection" class="ai-feature-section hidden">
+                <h2 class="text-3xl font-bold text-purple-800 mb-5">Generated Interview Questions</h2>
+                <ul id="questionsList" class="list-decimal list-inside text-purple-700 space-y-2"></ul>
+            </div>
+
+            <div id="improvementSuggestionsSection" class="ai-feature-section hidden">
+                <h2 class="text-3xl font-bold text-pink-800 mb-5">Resume Improvement Suggestions</h2>
+                <ul id="suggestionsList" class="list-disc list-inside text-pink-700 space-y-2"></ul>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="mt-6 error-message hidden">
+            <p class="font-bold text-lg mb-2">Error:</p>
+            <p id="errorText" class="text-base"></p>
+        </div>
+    </div>
+
+    <script>
+        console.log("Script loaded and starting execution.");
+
+        // Helper function to show/hide loading spinner and disable/enable button
+        function toggleLoading(buttonId, spinnerId, isLoading) {
+            console.log(`Toggling loading for ${buttonId}: ${isLoading}`);
+            const button = document.getElementById(buttonId);
+            const spinner = document.getElementById(spinnerId);
+            if (button && spinner) { // Check if elements exist
+                if (isLoading) {
+                    spinner.style.display = 'block';
+                    button.disabled = true;
+                    button.classList.add('opacity-70', 'cursor-not-allowed');
+                } else {
+                    spinner.style.display = 'none';
+                    button.disabled = false;
+                    button.classList.remove('opacity-70', 'cursor-not-allowed');
+                }
+            } else {
+                console.error(`Elements for buttonId: ${buttonId} or spinnerId: ${spinnerId} not found.`);
+            }
+        }
+
+        // Helper function to display errors
+        function displayError(error) {
+            console.error('Displaying error:', error);
+            const errorMessageDiv = document.getElementById('errorMessage');
+            const errorTextP = document.getElementById('errorText');
+            if (errorMessageDiv && errorTextP) {
+                errorTextP.textContent = error.message;
+                errorMessageDiv.classList.remove('hidden');
+            } else {
+                console.error('Error elements not found to display error.');
+            }
+        }
+
+        // Function to clear all result sections
+        function clearAllResults() {
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('errorMessage').classList.add('hidden');
+            document.getElementById('keywordsList').innerHTML = '';
+            document.getElementById('missingKeywordsList').innerHTML = '';
+            document.getElementById('summaryText').textContent = '';
+            document.getElementById('strengthsList').innerHTML = '';
+            document.getElementById('weaknessesList').innerHTML = '';
+            document.getElementById('questionsList').innerHTML = '';
+            document.getElementById('suggestionsList').innerHTML = '';
+
+            // Hide all specific sections
+            document.getElementById('keywordMatchingSection').classList.add('hidden');
+            document.getElementById('aiAnalysisSection').classList.add('hidden');
+            document.getElementById('interviewQuestionsSection').classList.add('hidden');
+            document.getElementById('improvementSuggestionsSection').classList.add('hidden');
+        }
+
+        const resumeUploadInput = document.getElementById('resumeUpload');
+        const resumeTextarea = document.getElementById('resumeText');
+        const uploadedFileNameSpan = document.getElementById('uploadedFileName');
+        const clearResumeButton = document.getElementById('clearResumeButton');
+        const fileUploadMessage = document.getElementById('fileUploadMessage');
+        const calculateAtsButton = document.getElementById('calculateAtsButton');
+
+        console.log("Attaching event listeners for file upload and clear button.");
+        if (resumeUploadInput) {
+            resumeUploadInput.addEventListener('change', async function(event) {
+                console.log("File input change event triggered.");
+                const file = event.target.files[0];
+                clearAllResults(); // Clear results on new file upload
+
+                if (file) {
+                    uploadedFileNameSpan.textContent = file.name;
+                    fileUploadMessage.classList.remove('hidden'); // Show the note
+                    calculateAtsButton.style.display = 'flex'; // Always show ATS button when a file is selected
+
+                    if (file.type === 'text/plain') {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            console.log("FileReader loaded .txt file.");
+                            resumeTextarea.value = e.target.result;
+                            calculateAtsButton.disabled = false; // Enable ATS button for .txt
+                        };
+                        reader.onerror = function() {
+                            console.error("FileReader error reading file.");
+                            displayError(new Error('Failed to read file.'));
+                            resumeTextarea.value = '';
+                            calculateAtsButton.disabled = true; // Disable ATS button on error
+                        };
+                        reader.readAsText(file);
+                    } else if (file.type === 'application/pdf' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                        console.log(`Uploading ${file.type} to backend for parsing.`);
+                        toggleLoading('calculateAtsButton', 'loadingSpinnerAts', true); // Show loading for ATS button
+
+                        const formData = new FormData();
+                        formData.append('resume_file', file);
+
+                        try {
+                            const response = await fetch('/upload_resume', {
+                                method: 'POST',
+                                body: formData
+                            });
+
+                            if (!response.ok) {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || `Failed to parse ${file.type} on server.`);
+                            }
+
+                            const data = await response.json();
+                            resumeTextarea.value = data.extracted_text;
+                            calculateAtsButton.disabled = false; // Enable ATS button after successful parsing
+                            console.log(`Successfully extracted text from ${file.type}.`);
+                            displayError(new Error(`Successfully extracted text from ${file.name}. You can now calculate ATS score.`)); // User feedback
+
+                        } catch (error) {
+                            console.error('Error uploading/parsing file:', error);
+                            displayError(new Error(`Error processing file: ${error.message}. Ensure it is a valid text-based PDF/DOCX.`));
+                            resumeTextarea.value = '';
+                            calculateAtsButton.disabled = true; // Disable ATS button on backend error
+                        } finally {
+                            toggleLoading('calculateAtsButton', 'loadingSpinnerAts', false);
+                        }
+                    } else {
+                        console.warn("Unsupported file type selected:", file.type);
+                        displayError(new Error('Unsupported file type. Please upload a .txt, .pdf, or .docx file.'));
+                        resumeTextarea.value = '';
+                        uploadedFileNameSpan.textContent = 'No file chosen';
+                        fileUploadMessage.classList.add('hidden');
+                        calculateAtsButton.disabled = true; // Disable ATS button
+                        calculateAtsButton.style.display = 'none'; // Hide ATS button
+                    }
+                } else {
+                    console.log("No file chosen.");
+                    uploadedFileNameSpan.textContent = 'No file chosen';
+                    resumeTextarea.value = '';
+                    fileUploadMessage.classList.add('hidden');
+                    calculateAtsButton.disabled = true; // Disable ATS button
+                    calculateAtsButton.style.display = 'none'; // Hide ATS button
+                }
+            });
+        } else {
+            console.error("resumeUploadInput element not found.");
+        }
+
+        if (clearResumeButton) {
+            clearResumeButton.addEventListener('click', () => {
+                console.log("Clear Resume button clicked.");
+                resumeTextarea.value = '';
+                resumeUploadInput.value = ''; // Clear the file input
+                uploadedFileNameSpan.textContent = 'No file chosen';
+                fileUploadMessage.classList.add('hidden');
+                document.getElementById('errorMessage').classList.add('hidden'); // Clear error message too
+                calculateAtsButton.disabled = true; // Disable ATS button
+                calculateAtsButton.style.display = 'none'; // Hide ATS button
+                clearAllResults(); // Clear all results when clearing resume
+            });
+        } else {
+            console.error("clearResumeButton element not found.");
+        }
+
+        // New: Calculate ATS Score Button
+        // Re-get reference for clarity, as it might be defined above the if block
+        const calculateAtsButtonElement = document.getElementById('calculateAtsButton');
+        if (calculateAtsButtonElement) {
+            calculateAtsButtonElement.addEventListener('click', async () => {
+                console.log("Calculate ATS Score button clicked.");
+                const jobDescription = document.getElementById('jobDescription').value;
+                const resumeText = document.getElementById('resumeText').value;
+                const scoreSpan = document.getElementById('score');
+                const keywordsList = document.getElementById('keywordsList');
+                const missingKeywordsList = document.getElementById('missingKeywordsList');
+
+                clearAllResults(); // Clear all previous results
+
+                toggleLoading('calculateAtsButton', 'loadingSpinnerAts', true);
+
+                try {
+                    if (!jobDescription || !resumeText) {
+                        throw new Error('Both job description and resume text are required for ATS calculation.');
+                    }
+
+                    console.log("Initiating ATS score fetch request.");
+                    const keywordResponse = await fetch('/score_resume', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ job_description: jobDescription, resume_text: resumeText })
+                    });
+                    console.log(`ATS score response status: ${keywordResponse.status}, OK: ${keywordResponse.ok}`);
+
+                    if (!keywordResponse.ok) {
+                        const errorData = await keywordResponse.json();
+                        throw new Error(errorData.error || 'ATS calculation failed.');
+                    }
+
+                    const keywordData = await keywordResponse.json();
+                    console.log("ATS score data received:", keywordData);
+
+                    scoreSpan.textContent = keywordData.score.toFixed(2);
+                    document.getElementById('results').classList.remove('hidden');
+                    document.getElementById('keywordMatchingSection').classList.remove('hidden'); // Show only ATS section
+
+                    // Populate matched keywords
+                    if (keywordData.matched_keywords && keywordData.matched_keywords.length > 0) {
+                        keywordsList.innerHTML = ''; // Clear before populating
+                        keywordData.matched_keywords.forEach(keyword => {
+                            const li = document.createElement('li');
+                            li.textContent = keyword;
+                            keywordsList.appendChild(li);
+                        });
+                    } else {
+                        keywordsList.innerHTML = '<li>No specific keywords matched based on the current algorithm.</li>';
+                    }
+
+                    // Populate missing keywords
+                    if (keywordData.missing_keywords && keywordData.missing_keywords.length > 0) {
+                        missingKeywordsList.innerHTML = ''; // Clear before populating
+                        keywordData.missing_keywords.forEach(keyword => {
+                            const li = document.createElement('li');
+                            li.textContent = keyword;
+                            missingKeywordsList.appendChild(li);
+                        });
+                    } else {
+                        missingKeywordsList.innerHTML = '<li>All relevant keywords from the job description were found in the resume.</li>';
+                    }
+
+                } catch (error) {
+                    console.error('Error in ATS calculation process:', error);
+                    displayError(error);
+                } finally {
+                    toggleLoading('calculateAtsButton', 'loadingSpinnerAts', false);
+                }
+            });
+        } else {
+            console.error("calculateAtsButton element not found.");
+        }
+
+
+        // Main Score & Analyze Button (remains as before, shows all results)
+        const scoreButton = document.getElementById('scoreButton');
+        if (scoreButton) {
+            scoreButton.addEventListener('click', async () => {
+                console.log("Score & Analyze Resume button clicked.");
+                const jobDescription = document.getElementById('jobDescription').value;
+                const resumeText = document.getElementById('resumeText').value;
+                const scoreSpan = document.getElementById('score');
+                const keywordsList = document.getElementById('keywordsList');
+                const missingKeywordsList = document.getElementById('missingKeywordsList');
+                const summaryText = document.getElementById('summaryText');
+                const strengthsList = document.getElementById('strengthsList');
+                const weaknessesList = document.getElementById('weaknessesList');
+
+                clearAllResults(); // Clear all previous results
+                document.getElementById('results').classList.remove('hidden'); // Ensure results container is visible
+                document.getElementById('keywordMatchingSection').classList.remove('hidden'); // Show ATS section
+                document.getElementById('aiAnalysisSection').classList.remove('hidden'); // Show AI Analysis section
+
+
+                toggleLoading('scoreButton', 'loadingSpinnerScore', true);
+
+                try {
+                    if (!jobDescription || !resumeText) {
+                        throw new Error('Both job description and resume text are required for full analysis.');
+                    }
+                    // --- Step 1: Keyword Matching (ATS Score) ---
+                    console.log("Initiating keyword matching fetch request for full analysis.");
+                    const keywordResponse = await fetch('/score_resume', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ job_description: jobDescription, resume_text: resumeText })
+                    });
+                    console.log(`Keyword matching response status: ${keywordResponse.status}, OK: ${keywordResponse.ok}`);
+
+                    if (!keywordResponse.ok) {
+                        const errorData = await keywordResponse.json();
+                        throw new Error(errorData.error || 'Keyword matching failed.');
+                    }
+
+                    const keywordData = await keywordResponse.json();
+                    console.log("Keyword matching data received:", keywordData);
+
+                    scoreSpan.textContent = keywordData.score.toFixed(2);
+
+                    // Populate matched keywords
+                    if (keywordData.matched_keywords && keywordData.matched_keywords.length > 0) {
+                        keywordsList.innerHTML = ''; // Clear before populating
+                        keywordData.matched_keywords.forEach(keyword => {
+                            const li = document.createElement('li');
+                            li.textContent = keyword;
+                            keywordsList.appendChild(li);
+                        });
+                    } else {
+                        keywordsList.innerHTML = '<li>No specific keywords matched based on the current algorithm.</li>';
+                    }
+
+                    // Populate missing keywords
+                    if (keywordData.missing_keywords && keywordData.missing_keywords.length > 0) {
+                        missingKeywordsList.innerHTML = ''; // Clear before populating
+                        keywordData.missing_keywords.forEach(keyword => {
+                            const li = document.createElement('li');
+                            li.textContent = keyword;
+                            missingKeywordsList.appendChild(li);
+                        });
+                    } else {
+                        missingKeywordsList.innerHTML = '<li>All relevant keywords from the job description were found in the resume.</li>';
+                    }
+
+                    // --- Step 2: AI Analysis ---
+                    console.log("Initiating AI analysis fetch request.");
+                    const aiResponse = await fetch('/analyze_resume_ai', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ job_description: jobDescription, resume_text: resumeText })
+                    });
+                    console.log(`AI analysis response status: ${aiResponse.status}, OK: ${aiResponse.ok}`);
+
+                    if (!aiResponse.ok) {
+                        const errorData = await aiResponse.json();
+                        throw new Error(errorData.error || 'AI analysis failed.');
+                    }
+
+                    const aiData = await aiResponse.json();
+                    console.log("AI analysis data received:", aiData);
+
+                    // Populate AI analysis results
+                    summaryText.textContent = aiData.summary || 'N/A';
+
+                    if (aiData.strengths && aiData.strengths.length > 0) {
+                        strengthsList.innerHTML = ''; // Clear before populating
+                        aiData.strengths.forEach(item => {
+                            const li = document.createElement('li');
+                            li.textContent = item;
+                            strengthsList.appendChild(li);
+                        });
+                    } else {
+                        strengthsList.innerHTML = '<li>No specific strengths identified by AI.</li>';
+                    }
+
+                    if (aiData.weaknesses && aiData.weaknesses.length > 0) {
+                        weaknessesList.innerHTML = ''; // Clear before populating
+                        aiData.weaknesses.forEach(item => {
+                            const li = document.createElement('li');
+                            li.textContent = item;
+                            weaknessesList.appendChild(li);
+                        });
+                    } else {
+                        weaknessesList.innerHTML = '<li>No specific areas for improvement identified by AI.</li>';
+                    }
+
+                } catch (error) {
+                    console.error('Error in Score & Analyze process:', error);
+                    displayError(error);
+                } finally {
+                    toggleLoading('scoreButton', 'loadingSpinnerScore', false);
+                }
+            });
+        } else {
+            console.error("scoreButton element not found.");
+        }
+
+
+        // Generate Interview Questions Button
+        const interviewQuestionsButton = document.getElementById('interviewQuestionsButton');
+        if (interviewQuestionsButton) {
+            interviewQuestionsButton.addEventListener('click', async () => {
+                console.log("Interview Questions button clicked.");
+                const jobDescription = document.getElementById('jobDescription').value;
+                const resumeText = document.getElementById('resumeText').value;
+                const questionsList = document.getElementById('questionsList');
+                const questionsSection = document.getElementById('interviewQuestionsSection');
+
+                clearAllResults(); // Clear all previous results
+                document.getElementById('results').classList.remove('hidden'); // Ensure results container is visible
+                questionsSection.classList.remove('hidden'); // Show this specific section
+
+                toggleLoading('interviewQuestionsButton', 'loadingSpinnerQuestions', true);
+
+                try {
+                    if (!jobDescription || !resumeText) {
+                        throw new Error('Both job description and resume text are required to generate questions.');
+                    }
+                    console.log("Initiating interview questions fetch request.");
+                    const response = await fetch('/generate_interview_questions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ job_description: jobDescription, resume_text: resumeText })
+                    });
+                    console.log(`Interview questions response status: ${response.status}, OK: ${response.ok}`);
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to generate interview questions.');
+                    }
+
+                    const data = await response.json();
+                    console.log("Interview questions data received:", data);
+
+                    if (data.questions && data.questions.length > 0) {
+                        questionsList.innerHTML = ''; // Clear before populating
+                        data.questions.forEach(question => {
+                            const li = document.createElement('li');
+                            li.textContent = question;
+                            questionsList.appendChild(li);
+                        });
+                    } else {
+                        questionsList.innerHTML = '<li>No interview questions could be generated.</li>';
+                    }
+
+                } catch (error) {
+                    console.error('Error generating interview questions:', error);
+                    displayError(error);
+                } finally {
+                    toggleLoading('interviewQuestionsButton', 'loadingSpinnerQuestions', false);
+                }
+            });
+        } else {
+            console.error("interviewQuestionsButton element not found.");
+        }
+
+
+        // Suggest Resume Improvements Button
+        const improvementSuggestionsButton = document.getElementById('improvementSuggestionsButton');
+        if (improvementSuggestionsButton) {
+            improvementSuggestionsButton.addEventListener('click', async () => {
+                console.log("Improvement Suggestions button clicked.");
+                const jobDescription = document.getElementById('jobDescription').value;
+                const resumeText = document.getElementById('resumeText').value;
+                const suggestionsList = document.getElementById('suggestionsList');
+                const suggestionsSection = document.getElementById('improvementSuggestionsSection');
+
+                clearAllResults(); // Clear all previous results
+                document.getElementById('results').classList.remove('hidden'); // Ensure results container is visible
+                suggestionsSection.classList.remove('hidden'); // Show this specific section
+
+                toggleLoading('improvementSuggestionsButton', 'loadingSpinnerImprovements', true);
+
+                try {
+                    if (!jobDescription || !resumeText) {
+                        throw new Error('Both job description and resume text are required to suggest improvements.');
+                    }
+                    console.log("Initiating improvement suggestions fetch request.");
+                    const response = await fetch('/suggest_resume_improvements', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ job_description: jobDescription, resume_text: resumeText })
+                    });
+                    console.log(`Improvement suggestions response status: ${response.status}, OK: ${response.ok}`);
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to get improvement suggestions.');
+                    }
+
+                    const data = await response.json();
+                    console.log("Improvement suggestions data received:", data);
+
+                    if (data.suggestions && data.suggestions.length > 0) {
+                        suggestionsList.innerHTML = ''; // Clear before populating
+                        data.suggestions.forEach(suggestion => {
+                            const li = document.createElement('li');
+                            li.textContent = suggestion;
+                            suggestionsList.appendChild(li);
+                        });
+                    } else {
+                        suggestionsList.innerHTML = '<li>No specific improvement suggestions could be generated.</li>';
+                    }
+
+                } catch (error) {
+                    console.error('Error suggesting resume improvements:', error);
+                    displayError(error);
+                } finally {
+                    toggleLoading('improvementSuggestionsButton', 'loadingSpinnerImprovements', false);
+                }
+            });
+        } else {
+            console.error("improvementSuggestionsButton element not found.");
+        }
+
+        console.log("All event listeners attempted to be attached.");
+    </script>
+</body>
+</html>
